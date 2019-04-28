@@ -1,0 +1,23 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "BRPlugins",
+	"Description": "",
+	"Category": "Other",
+	"CreatedBy": "bluerose",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "BRPlugins",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
