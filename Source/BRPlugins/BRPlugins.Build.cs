@@ -26,6 +26,11 @@ public class BRPlugins : ModuleRules
 			new string[]
 			{
 				"Core",
+				"CoreUObject",
+				"Engine",
+				"RHI",
+				"Engine",
+				"RenderCore",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -34,10 +39,7 @@ public class BRPlugins : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"CoreUObject",
-				"Engine",
-				"Slate",
-				"SlateCore",
+				 "Projects",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

@@ -17,7 +17,7 @@
 		{
 			"Name": "BRPlugins",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PostConfigInit"
 		}
 	]
 }
