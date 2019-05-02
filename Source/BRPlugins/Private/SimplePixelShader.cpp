@@ -1,7 +1,4 @@
-// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
-
-#include "LensDistortionAPI.h"
-
+#include "SimplePixelShader.h"
 
 #include "Classes/Engine/TextureRenderTarget2D.h"
 #include "Classes/Engine/World.h"
@@ -14,45 +11,9 @@
 #include "Logging/MessageLog.h"
 #include "Internationalization/Internationalization.h"
 
+#define LOCTEXT_NAMESPACE "SimplePixelShader"  
 
-static const uint32 kGridSubdivisionX = 32;
-static const uint32 kGridSubdivisionY = 16;
-
-#define LOCTEXT_NAMESPACE "LensDistortionPlugin"
-
-
-/**
- * Internal intermediary structure derived from FLensDistortionCameraModel by the game thread
- * to hand to the render thread.
- */
-struct FCompiledCameraModel
-{
-	/** Orignal camera model that has generated this compiled model. */
-	FLensDistortionCameraModel OriginalCameraModel;
-
-	/** Camera matrices of the lens distortion for the undistorted and distorted render.
-	 *  XY holds the scales factors, ZW holds the translates.
-	 */
-	FVector4 DistortedCameraMatrix;
-	FVector4 UndistortedCameraMatrix;
-
-	/** Output multiply and add of the channel to the render target. */
-	FVector2D OutputMultiplyAndAdd;
-};
-
-
-/** Undistorts top left originated viewport UV into the view space (x', y', z'=1.f) */
-static FVector2D LensUndistortViewportUVIntoViewSpace(
-	const FLensDistortionCameraModel& CameraModel,
-	float TanHalfDistortedHorizontalFOV, float DistortedAspectRatio,
-	FVector2D DistortedViewportUV)
-{
-	FVector2D AspectRatioAwareF = CameraModel.F * FVector2D(1, -DistortedAspectRatio);
-	return CameraModel.UndistortNormalizedViewPosition((DistortedViewportUV - CameraModel.C) / AspectRatioAwareF);
-}
-
-
-class FLensDistortionUVGenerationShader : public FGlobalShader
+class FSimplePixelShader : public FGlobalShader
 {
 public:
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
@@ -63,124 +24,78 @@ public:
 	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
 	{
 		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
-		OutEnvironment.SetDefine(TEXT("GRID_SUBDIVISION_X"), kGridSubdivisionX);
-		OutEnvironment.SetDefine(TEXT("GRID_SUBDIVISION_Y"), kGridSubdivisionY);
-	}
-
-	FLensDistortionUVGenerationShader() {}
-
-	FLensDistortionUVGenerationShader(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
+        OutEnvironment.SetDefine(TEXT("TEST_MICRO"), 1);  
+    }
+    FSimplePixelShader(){}
+    FSimplePixelShader(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
 		: FGlobalShader(Initializer)
 	{
-		PixelUVSize.Bind(Initializer.ParameterMap, TEXT("PixelUVSize"));
-		RadialDistortionCoefs.Bind(Initializer.ParameterMap, TEXT("RadialDistortionCoefs"));
-		TangentialDistortionCoefs.Bind(Initializer.ParameterMap, TEXT("TangentialDistortionCoefs"));
-		DistortedCameraMatrix.Bind(Initializer.ParameterMap, TEXT("DistortedCameraMatrix"));
-		UndistortedCameraMatrix.Bind(Initializer.ParameterMap, TEXT("UndistortedCameraMatrix"));
-		OutputMultiplyAndAdd.Bind(Initializer.ParameterMap, TEXT("OutputMultiplyAndAdd"));
+		 SimpleColorVal.Bind(Initializer.ParameterMap, TEXT("SimpleColor")); 
 	}
-
 	template<typename TShaderRHIParamRef>
-	void SetParameters(
-		FRHICommandListImmediate& RHICmdList,
-		const TShaderRHIParamRef ShaderRHI,
-		const FCompiledCameraModel& CompiledCameraModel,
-		const FIntPoint& DisplacementMapResolution)
-	{
-		FVector2D PixelUVSizeValue(
-			1.f / float(DisplacementMapResolution.X), 1.f / float(DisplacementMapResolution.Y));
-		FVector RadialDistortionCoefsValue(
-			CompiledCameraModel.OriginalCameraModel.K1,
-			CompiledCameraModel.OriginalCameraModel.K2,
-			CompiledCameraModel.OriginalCameraModel.K3);
-		FVector2D TangentialDistortionCoefsValue(
-			CompiledCameraModel.OriginalCameraModel.P1,
-			CompiledCameraModel.OriginalCameraModel.P2);
+    void SetParameters(FRHICommandListImmediate& RHICmdList,const TShaderRHIParamRef ShaderRHI,	const FLinearColor &MyColor)
+    {
+        SetShaderValue(RHICmdList, ShaderRHI, SimpleColorVal, MyColor); 
+    }
 
-		SetShaderValue(RHICmdList, ShaderRHI, PixelUVSize, PixelUVSizeValue);
-		SetShaderValue(RHICmdList, ShaderRHI, DistortedCameraMatrix, CompiledCameraModel.DistortedCameraMatrix);
-		SetShaderValue(RHICmdList, ShaderRHI, UndistortedCameraMatrix, CompiledCameraModel.UndistortedCameraMatrix);
-		SetShaderValue(RHICmdList, ShaderRHI, RadialDistortionCoefs, RadialDistortionCoefsValue);
-		SetShaderValue(RHICmdList, ShaderRHI, TangentialDistortionCoefs, TangentialDistortionCoefsValue);
-		SetShaderValue(RHICmdList, ShaderRHI, OutputMultiplyAndAdd, CompiledCameraModel.OutputMultiplyAndAdd);
-	}
-
-	virtual bool Serialize(FArchive& Ar) override
+    virtual bool Serialize(FArchive& Ar) override
 	{
 		bool bShaderHasOutdatedParameters = FGlobalShader::Serialize(Ar);
-		Ar << PixelUVSize << RadialDistortionCoefs << TangentialDistortionCoefs << DistortedCameraMatrix << UndistortedCameraMatrix << OutputMultiplyAndAdd;
+		Ar << SimpleColorVal;
 		return bShaderHasOutdatedParameters;
 	}
-
 private:
-	FShaderParameter PixelUVSize;
-	FShaderParameter RadialDistortionCoefs;
-	FShaderParameter TangentialDistortionCoefs;
-	FShaderParameter DistortedCameraMatrix;
-	FShaderParameter UndistortedCameraMatrix;
-	FShaderParameter OutputMultiplyAndAdd;
-
+    FShaderParameter SimpleColorVal;  
 };
 
-
-class FLensDistortionUVGenerationVS : public FLensDistortionUVGenerationShader
+class FSimplePixelShaderVS : public FSimplePixelShader
 {
-	DECLARE_SHADER_TYPE(FLensDistortionUVGenerationVS, Global);
-
+    DECLARE_SHADER_TYPE(FSimplePixelShaderVS, Global);
 public:
+    FSimplePixelShaderVS(){}
 
-	/** Default constructor. */
-	FLensDistortionUVGenerationVS() {}
-
-	/** Initialization constructor. */
-	FLensDistortionUVGenerationVS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
-		: FLensDistortionUVGenerationShader(Initializer)
+  	FSimplePixelShaderVS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
+		: FSimplePixelShader(Initializer)
 	{
 	}
 };
 
-
-class FLensDistortionUVGenerationPS : public FLensDistortionUVGenerationShader
+class FSimplePixelShaderPS : public FSimplePixelShader
 {
-	DECLARE_SHADER_TYPE(FLensDistortionUVGenerationPS, Global);
-
+    DECLARE_SHADER_TYPE(FSimplePixelShaderPS, Global);
 public:
+    FSimplePixelShaderPS(){}
 
-	/** Default constructor. */
-	FLensDistortionUVGenerationPS() {}
-
-	/** Initialization constructor. */
-	FLensDistortionUVGenerationPS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
-		: FLensDistortionUVGenerationShader(Initializer)
-	{ }
+  	FSimplePixelShaderPS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
+		: FSimplePixelShader(Initializer)
+	{
+	}
 };
 
+IMPLEMENT_SHADER_TYPE(, FSimplePixelShaderVS, TEXT("/Plugin/BRPlugins/Private/SimplePixelShader.usf"), TEXT("MainVS"), SF_Vertex)
+IMPLEMENT_SHADER_TYPE(, FSimplePixelShaderPS, TEXT("/Plugin/BRPlugins/Private/SimplePixelShader.usf"), TEXT("MainPS"), SF_Pixel)
 
-IMPLEMENT_SHADER_TYPE(, FLensDistortionUVGenerationVS, TEXT("/Plugin/LensDistortion/Private/UVGeneration.usf"), TEXT("MainVS"), SF_Vertex)
-IMPLEMENT_SHADER_TYPE(, FLensDistortionUVGenerationPS, TEXT("/Plugin/LensDistortion/Private/UVGeneration.usf"), TEXT("MainPS"), SF_Pixel)
-
-
-static void DrawUVDisplacementToRenderTarget_RenderThread(
-	FRHICommandListImmediate& RHICmdList,
-	const FCompiledCameraModel& CompiledCameraModel,
-	const FName& TextureRenderTargetName,
-	FTextureRenderTargetResource* OutTextureRenderTargetResource,
-	ERHIFeatureLevel::Type FeatureLevel)
-{
-	check(IsInRenderingThread());
-
-#if WANTS_DRAW_MESH_EVENTS
-	FString EventName;
-	TextureRenderTargetName.ToString(EventName);
-	SCOPED_DRAW_EVENTF(RHICmdList, SceneCapture, TEXT("LensDistortionDisplacementGeneration %s"), *EventName);
-#else
-	SCOPED_DRAW_EVENT(RHICmdList, DrawUVDisplacementToRenderTarget_RenderThread);
-#endif
-
-	FRHIRenderPassInfo RPInfo(OutTextureRenderTargetResource->GetRenderTargetTexture(), ERenderTargetActions::DontLoad_Store, OutTextureRenderTargetResource->TextureRHI);
+static void DrawTestShaderRenderTarget_RenderThread(  
+    FRHICommandListImmediate& RHICmdList,   
+    FTextureRenderTargetResource* OutputRenderTargetResource,  
+    ERHIFeatureLevel::Type FeatureLevel,  
+    const FName TextureRenderTargetName,  
+    const FLinearColor MyColor  
+)  
+{  
+    check(IsInRenderingThread());  
+ 
+#if WANTS_DRAW_MESH_EVENTS  
+    FString EventName;  
+    TextureRenderTargetName.ToString(EventName);  
+    SCOPED_DRAW_EVENTF(RHICmdList, SceneCapture, TEXT("ShaderTest %s"), *EventName);  
+#else  
+    SCOPED_DRAW_EVENT(RHICmdList, DrawTestShaderRenderTarget_RenderThread);  
+#endif  
+	FRHIRenderPassInfo RPInfo(OutputRenderTargetResource->GetRenderTargetTexture(), ERenderTargetActions::DontLoad_Store, OutputRenderTargetResource->TextureRHI);
 	RHICmdList.BeginRenderPass(RPInfo, TEXT("DrawUVDisplacement"));
-	{
-		FIntPoint DisplacementMapResolution(OutTextureRenderTargetResource->GetSizeX(), OutTextureRenderTargetResource->GetSizeY());
+	
+		FIntPoint DisplacementMapResolution(OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY());
 
 		// Update viewport.
 		RHICmdList.SetViewport(
@@ -189,8 +104,8 @@ static void DrawUVDisplacementToRenderTarget_RenderThread(
 
 		// Get shaders.
 		TShaderMap<FGlobalShaderType>* GlobalShaderMap = GetGlobalShaderMap(FeatureLevel);
-		TShaderMapRef< FLensDistortionUVGenerationVS > VertexShader(GlobalShaderMap);
-		TShaderMapRef< FLensDistortionUVGenerationPS > PixelShader(GlobalShaderMap);
+		TShaderMapRef< FSimplePixelShaderVS > VertexShader(GlobalShaderMap);
+		TShaderMapRef< FSimplePixelShaderPS > PixelShader(GlobalShaderMap);
 
 		// Set the graphic pipeline state.
 		FGraphicsPipelineStateInitializer GraphicsPSOInit;
@@ -207,165 +122,77 @@ static void DrawUVDisplacementToRenderTarget_RenderThread(
 		// Update viewport.
 		RHICmdList.SetViewport(
 			0, 0, 0.f,
-			OutTextureRenderTargetResource->GetSizeX(), OutTextureRenderTargetResource->GetSizeY(), 1.f);
+			OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY(), 1.f);
 
 		// Update shader uniform parameters.
-		VertexShader->SetParameters(RHICmdList, VertexShader->GetVertexShader(), CompiledCameraModel, DisplacementMapResolution);
-		PixelShader->SetParameters(RHICmdList, PixelShader->GetPixelShader(), CompiledCameraModel, DisplacementMapResolution);
+		VertexShader->SetParameters(RHICmdList, VertexShader->GetVertexShader(),MyColor);
+		PixelShader->SetParameters(RHICmdList, PixelShader->GetPixelShader(),MyColor);
 
 		// Draw grid.
-		uint32 PrimitiveCount = kGridSubdivisionX * kGridSubdivisionY * 2;
-		RHICmdList.DrawPrimitive(0, PrimitiveCount, 1);
-	}
-	RHICmdList.EndRenderPass();
-}
-
-
-FVector2D FLensDistortionCameraModel::UndistortNormalizedViewPosition(FVector2D EngineV) const
-{
-	// Engine view space -> standard view space.
-	FVector2D V = FVector2D(1, -1) * EngineV;
-
-	FVector2D V2 = V * V;
-	float R2 = V2.X + V2.Y;
-
-	// Radial distortion (extra parenthesis to match MF_Undistortion.uasset).
-	FVector2D UndistortedV = V * (1.0 + (R2 * K1 + (R2 * R2) * K2 + (R2 * R2 * R2) * K3));
-
-	// Tangential distortion.
-	UndistortedV.X += P2 * (R2 + 2 * V2.X) + 2 * P1 * V.X * V.Y;
-	UndistortedV.Y += P1 * (R2 + 2 * V2.Y) + 2 * P2 * V.X * V.Y;
-
-	// Returns engine V.
-	return UndistortedV * FVector2D(1, -1);
-}
-
-
-/** Compiles the camera model. */
-float FLensDistortionCameraModel::GetUndistortOverscanFactor(
-	float DistortedHorizontalFOV, float DistortedAspectRatio) const
-{
-	// If the lens distortion model is identity, then early return 1.
-	if (*this == FLensDistortionCameraModel())
-	{
-		return 1.0f;
-	}
-
-	float TanHalfDistortedHorizontalFOV = FMath::Tan(DistortedHorizontalFOV * 0.5f);
-
-	// Get the position in the view space at z'=1 of different key point in the distorted Viewport UV coordinate system.
-	// This very approximative to know the required overscan scale factor of the undistorted viewport, but works really well in practice.
-	//
-	//  Undistorted UV position in the view space:
-	//                 ^ View space's Y
-	//                 |
-	//        0        1        2
-	//     
-	//        7        0        3 --> View space's X
-	//     
-	//        6        5        4
-	FVector2D UndistortCornerPos0 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(0.0f, 0.0f));
-	FVector2D UndistortCornerPos1 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(0.5f, 0.0f));
-	FVector2D UndistortCornerPos2 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(1.0f, 0.0f));
-	FVector2D UndistortCornerPos3 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(1.0f, 0.5f));
-	FVector2D UndistortCornerPos4 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(1.0f, 1.0f));
-	FVector2D UndistortCornerPos5 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(0.5f, 1.0f));
-	FVector2D UndistortCornerPos6 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(0.0f, 1.0f));
-	FVector2D UndistortCornerPos7 = LensUndistortViewportUVIntoViewSpace(
-		*this, TanHalfDistortedHorizontalFOV, DistortedAspectRatio, FVector2D(0.0f, 0.5f));
-
-	// Find min and max of the inner square of undistorted Viewport in the view space at z'=1.
-	FVector2D MinInnerViewportRect;
-	FVector2D MaxInnerViewportRect;
-	MinInnerViewportRect.X = FMath::Max3(UndistortCornerPos0.X, UndistortCornerPos6.X, UndistortCornerPos7.X);
-	MinInnerViewportRect.Y = FMath::Max3(UndistortCornerPos4.Y, UndistortCornerPos5.Y, UndistortCornerPos6.Y);
-	MaxInnerViewportRect.X = FMath::Min3(UndistortCornerPos2.X, UndistortCornerPos3.X, UndistortCornerPos4.X);
-	MaxInnerViewportRect.Y = FMath::Min3(UndistortCornerPos0.Y, UndistortCornerPos1.Y, UndistortCornerPos2.Y);
-
-	check(MinInnerViewportRect.X < 0.f);
-	check(MinInnerViewportRect.Y < 0.f);
-	check(MaxInnerViewportRect.X > 0.f);
-	check(MaxInnerViewportRect.Y > 0.f);
-
-	// Compute tan(VerticalFOV * 0.5)
-	float TanHalfDistortedVerticalFOV = TanHalfDistortedHorizontalFOV / DistortedAspectRatio;
-
-	// Compute the required undistorted viewport scale on each axes.
-	FVector2D ViewportScaleUpFactorPerViewAxis = 0.5 * FVector2D(
-		TanHalfDistortedHorizontalFOV / FMath::Max(-MinInnerViewportRect.X, MaxInnerViewportRect.X),
-		TanHalfDistortedVerticalFOV / FMath::Max(-MinInnerViewportRect.Y, MaxInnerViewportRect.Y));
-
-	// Scale up by 2% more the undistorted viewport size in the view space to work
-	// around the fact that odd undistorted positions might not exactly be at the minimal
-	// in case of a tangential distorted barrel lens distortion.
-	const float ViewportScaleUpConstMultiplier = 1.02f;
-	return FMath::Max(ViewportScaleUpFactorPerViewAxis.X, ViewportScaleUpFactorPerViewAxis.Y) * ViewportScaleUpConstMultiplier;
-}
-
-
-void FLensDistortionCameraModel::DrawUVDisplacementToRenderTarget(
-	UWorld* World,
-	float DistortedHorizontalFOV,
-	float DistortedAspectRatio,
-	float UndistortOverscanFactor,
-	UTextureRenderTarget2D* OutputRenderTarget,
-	float OutputMultiply,
-	float OutputAdd) const
-{
-	check(IsInGameThread());
-
-	if (!OutputRenderTarget)
-	{
-		FMessageLog("Blueprint").Warning(
-			LOCTEXT("LensDistortionCameraModel_DrawUVDisplacementToRenderTarget",
-			"DrawUVDisplacementToRenderTarget: Output render target is required."));
-		return;
-	}
-
-	// Compiles the camera model to know the overscan scale factor.
-	float TanHalfUndistortedHorizontalFOV = FMath::Tan(DistortedHorizontalFOV * 0.5f) * UndistortOverscanFactor;
-	float TanHalfUndistortedVerticalFOV = TanHalfUndistortedHorizontalFOV / DistortedAspectRatio;
-
-	// Output.
-	FCompiledCameraModel CompiledCameraModel;
-	CompiledCameraModel.OriginalCameraModel = *this;
-
-	CompiledCameraModel.DistortedCameraMatrix.X = 1.0f / TanHalfUndistortedHorizontalFOV;
-	CompiledCameraModel.DistortedCameraMatrix.Y = 1.0f / TanHalfUndistortedVerticalFOV;
-	CompiledCameraModel.DistortedCameraMatrix.Z = 0.5f;
-	CompiledCameraModel.DistortedCameraMatrix.W = 0.5f;
-
-	CompiledCameraModel.UndistortedCameraMatrix.X = F.X;
-	CompiledCameraModel.UndistortedCameraMatrix.Y = F.Y * DistortedAspectRatio;
-	CompiledCameraModel.UndistortedCameraMatrix.Z = C.X;
-	CompiledCameraModel.UndistortedCameraMatrix.W = C.Y;
-
-	CompiledCameraModel.OutputMultiplyAndAdd.X = OutputMultiply;
-	CompiledCameraModel.OutputMultiplyAndAdd.Y = OutputAdd;
-
-	const FName TextureRenderTargetName = OutputRenderTarget->GetFName();
-	FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
-
-	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();
-
-	ENQUEUE_RENDER_COMMAND(CaptureCommand)(
-		[CompiledCameraModel, TextureRenderTargetResource, TextureRenderTargetName, FeatureLevel](FRHICommandListImmediate& RHICmdList)
+		/*
+		理论上4.22应该用这个函数来绘制，但是不知道为什么有问题
+		RHICmdList.DrawPrimitive(0, 2, 1);
+		*/
+		
+		FVector4 Vertices[4];
+		Vertices[0].Set(-1.0f, 1.0f, 0, 1.0f);
+		Vertices[1].Set(1.0f, 1.0f, 0, 1.0f);
+		Vertices[2].Set(-1.0f, -1.0f, 0, 1.0f);
+		Vertices[3].Set(1.0f, -1.0f, 0, 1.0f);
+		static const uint16 Indices[6] =
 		{
-			DrawUVDisplacementToRenderTarget_RenderThread(
-				RHICmdList,
-				CompiledCameraModel,
-				TextureRenderTargetName,
-				TextureRenderTargetResource,
-				FeatureLevel);
-		}
-	);
-}
+			0, 1, 2,
+			2, 1, 3
+		};
 
-#undef LOCTEXT_NAMESPACE
+		DrawIndexedPrimitiveUP(
+			RHICmdList,
+			PT_TriangleList,
+			0,
+			ARRAY_COUNT(Vertices),
+			2,
+			Indices,
+			sizeof(Indices[0]),
+			Vertices,
+			sizeof(Vertices[0])
+		);
+		
+		// Resolve render target. 
+		
+		RHICmdList.CopyToResolveTarget(
+			OutputRenderTargetResource->GetRenderTargetTexture(),
+			OutputRenderTargetResource->TextureRHI,
+			FResolveParams());
+		
+		
+	
+	RHICmdList.EndRenderPass();
+}  
+ 
+USimplePixelShaderBlueprintLibrary::USimplePixelShaderBlueprintLibrary(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{ }
+
+void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(UTextureRenderTarget2D* OutputRenderTarget,AActor* Ac, FLinearColor MyColor  
+)  
+{  
+    check(IsInGameThread());  
+ 
+    if (!OutputRenderTarget)  
+    {  
+        return;  
+    }  
+ 
+    FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();  
+    UWorld* World = Ac->GetWorld();  
+    ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();  
+    FName TextureRenderTargetName = OutputRenderTarget->GetFName();  
+    ENQUEUE_RENDER_COMMAND(CaptureCommand)(  
+        [TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName](FRHICommandListImmediate& RHICmdList)  
+        {  
+            DrawTestShaderRenderTarget_RenderThread(RHICmdList,TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor);  
+        }  
+    );  
+}  
+
+#undef LOCTEXT_NAMESPACE  
