@@ -10,6 +10,7 @@
 #include "ShaderParameterUtils.h"
 #include "Logging/MessageLog.h"
 #include "Internationalization/Internationalization.h"
+#include "Containers/DynamicRHIResourceArray.h"
 
 #define LOCTEXT_NAMESPACE "SimplePixelShader"  
 
@@ -17,6 +18,64 @@ struct FTextureVertex{
 	FVector4 Position;
 	FVector2D UV;
 };
+
+
+class FRectangleVertexBuffer : public FVertexBuffer
+{
+public:
+	/** Initialize the RHI for this rendering resource */
+	void InitRHI() override 
+	{
+		TResourceArray<FTextureVertex, VERTEXBUFFER_ALIGNMENT> Vertices;
+		Vertices.SetNumUninitialized(6);
+	
+		Vertices[0].Position = FVector4(1, 1, 0, 1);
+		Vertices[0].UV = FVector2D(1, 1);
+
+		Vertices[1].Position = FVector4(-1, 1, 0, 1);
+		Vertices[1].UV = FVector2D(0, 1);
+
+		Vertices[2].Position = FVector4(1, -1, 0, 1);
+		Vertices[2].UV = FVector2D(1, 0);
+
+		Vertices[3].Position = FVector4(-1, -1, 0, 1);
+		Vertices[3].UV = FVector2D(0, 0);
+
+		//The final two vertices are used for the triangle optimization (a single triangle spans the entire viewport )
+		Vertices[4].Position = FVector4(-1, 1, 0, 1);
+		Vertices[4].UV = FVector2D(-1, 1);
+
+		Vertices[5].Position = FVector4(1, -1, 0, 1);
+		Vertices[5].UV = FVector2D(1, -1);
+
+		// Create vertex buffer. Fill buffer with initial data upon creation
+		FRHIResourceCreateInfo CreateInfo(&Vertices);
+		VertexBufferRHI = RHICreateVertexBuffer(Vertices.GetResourceDataSize(), BUF_Static, CreateInfo);
+	}
+};
+
+class FRectangleIndexBuffer : public FIndexBuffer
+{
+public:
+	/** Initialize the RHI for this rendering resource */
+	void InitRHI() override 
+	{
+		// Indices 0 - 5 are used for rendering a quad. Indices 6 - 8 are used for triangle optimization.
+		const uint16 Indices[] = { 0, 1, 2, 2, 1, 3, 0, 4, 5 };
+
+		TResourceArray<uint16, INDEXBUFFER_ALIGNMENT> IndexBuffer;
+		uint32 NumIndices = ARRAY_COUNT(Indices);
+		IndexBuffer.AddUninitialized(NumIndices);
+		FMemory::Memcpy(IndexBuffer.GetData(), Indices, NumIndices * sizeof(uint16));
+
+		// Create index buffer. Fill buffer with initial data upon creation
+		FRHIResourceCreateInfo CreateInfo(&IndexBuffer);
+		IndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), IndexBuffer.GetResourceDataSize(), BUF_Static, CreateInfo);
+	}
+};
+
+TGlobalResource<FRectangleVertexBuffer> GRectangleVertexBuffer;
+TGlobalResource<FRectangleIndexBuffer> GRectangleIndexBuffer;
 
 class FTextureVertexDeclaration : public FRenderResource
 {
@@ -162,48 +221,17 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		VertexShader->SetParameters(RHICmdList, VertexShader->GetVertexShader(),MyColor,TextureRHI);
 		PixelShader->SetParameters(RHICmdList, PixelShader->GetPixelShader(),MyColor,TextureRHI);
 
-		// Draw grid.
-		/*
-		理论上4.22应该用这个函数来绘制，但是不知道为什么有问题
-		RHICmdList.DrawPrimitive(0, 2, 1);
-		*/
-		
-		FTextureVertex Vertices[4];
-		Vertices[0].Position.Set(-1.0f, 1.0f, 0, 1.0f);
-		Vertices[1].Position.Set(1.0f, 1.0f, 0, 1.0f);
-		Vertices[2].Position.Set(-1.0f, -1.0f, 0, 1.0f);
-		Vertices[3].Position.Set(1.0f, -1.0f, 0, 1.0f);
-		Vertices[0].UV.Set(0,1.0f);
-		Vertices[1].UV.Set(1.0f,1.0f);
-		Vertices[2].UV.Set(0,0);
-		Vertices[3].UV.Set(1.0f,0.0);
-		static const uint16 Indices[6] =
-		{
-			0, 1, 2,
-			2, 1, 3
-		};
+		RHICmdList.SetStreamSource(0, GRectangleVertexBuffer.VertexBufferRHI, 0);
 
-		DrawIndexedPrimitiveUP(
-			RHICmdList,
-			PT_TriangleList,
-			0,
-			ARRAY_COUNT(Vertices),
-			2,
-			Indices,
-			sizeof(Indices[0]),
-			Vertices,
-			sizeof(Vertices[0])
-		);
+		RHICmdList.DrawIndexedPrimitive(
+			GRectangleIndexBuffer.IndexBufferRHI,
+			/*BaseVertexIndex=*/ 0,
+			/*MinIndex=*/ 0,
+			/*NumVertices=*/ 4,
+			/*StartIndex=*/ 0,
+			/*NumPrimitives=*/ 2,
+			/*NumInstances=*/ 1);
 		
-		// Resolve render target. 
-		
-		RHICmdList.CopyToResolveTarget(
-			OutputRenderTargetResource->GetRenderTargetTexture(),
-			OutputRenderTargetResource->TextureRHI,
-			FResolveParams());
-		
-		
-	
 	RHICmdList.EndRenderPass();
 }  
  
