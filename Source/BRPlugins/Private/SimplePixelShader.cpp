@@ -13,6 +13,29 @@
 
 #define LOCTEXT_NAMESPACE "SimplePixelShader"  
 
+struct FTextureVertex{
+	FVector4 Position;
+	FVector2D UV;
+};
+
+class FTextureVertexDeclaration : public FRenderResource
+{
+public:
+	FVertexDeclarationRHIRef VertexDeclarationRHI;
+	virtual void InitRHI() override
+	{
+		FVertexDeclarationElementList Elements;
+		uint32 Stride = sizeof(FTextureVertex);
+		Elements.Add(FVertexElement(0, STRUCT_OFFSET(FTextureVertex, Position), VET_Float2, 0, Stride));
+		Elements.Add(FVertexElement(0, STRUCT_OFFSET(FTextureVertex, UV), VET_Float2, 1, Stride));
+		VertexDeclarationRHI = RHICreateVertexDeclaration(Elements);
+	}
+	virtual void ReleaseRHI() override
+	{
+		VertexDeclarationRHI.SafeRelease();
+	}
+};
+
 class FSimplePixelShader : public FGlobalShader
 {
 public:
@@ -31,21 +54,27 @@ public:
 		: FGlobalShader(Initializer)
 	{
 		 SimpleColorVal.Bind(Initializer.ParameterMap, TEXT("SimpleColor")); 
+		 TextureVal.Bind(Initializer.ParameterMap, TEXT("TextureVal"));
+		 TextureSampler.Bind(Initializer.ParameterMap, TEXT("TextureSampler"));
 	}
 	template<typename TShaderRHIParamRef>
-    void SetParameters(FRHICommandListImmediate& RHICmdList,const TShaderRHIParamRef ShaderRHI,	const FLinearColor &MyColor)
+    void SetParameters(FRHICommandListImmediate& RHICmdList,const TShaderRHIParamRef ShaderRHI,	const FLinearColor &MyColor,const FTextureRHIParamRef& TextureRHI)
     {
         SetShaderValue(RHICmdList, ShaderRHI, SimpleColorVal, MyColor); 
+		SetTextureParameter(RHICmdList, ShaderRHI, TextureVal, TextureSampler,TStaticSamplerState<SF_Trilinear,AM_Clamp,AM_Clamp,AM_Clamp>::GetRHI(),TextureRHI);
     }
 
     virtual bool Serialize(FArchive& Ar) override
 	{
 		bool bShaderHasOutdatedParameters = FGlobalShader::Serialize(Ar);
-		Ar << SimpleColorVal;
+		Ar << SimpleColorVal<< TextureVal<< TextureSampler;
 		return bShaderHasOutdatedParameters;
 	}
 private:
-    FShaderParameter SimpleColorVal;  
+    FShaderParameter SimpleColorVal;
+
+	FShaderResourceParameter TextureVal;
+	FShaderResourceParameter TextureSampler;
 };
 
 class FSimplePixelShaderVS : public FSimplePixelShader
@@ -80,7 +109,8 @@ static void DrawTestShaderRenderTarget_RenderThread(
     FTextureRenderTargetResource* OutputRenderTargetResource,  
     ERHIFeatureLevel::Type FeatureLevel,  
     const FName TextureRenderTargetName,  
-    const FLinearColor MyColor  
+    const FLinearColor MyColor,
+	const FTextureRHIParamRef TextureRHI
 )  
 {  
     check(IsInRenderingThread());  
@@ -107,6 +137,9 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		TShaderMapRef< FSimplePixelShaderVS > VertexShader(GlobalShaderMap);
 		TShaderMapRef< FSimplePixelShaderPS > PixelShader(GlobalShaderMap);
 
+		FTextureVertexDeclaration VertexDeclaration;
+		VertexDeclaration.InitRHI();
+
 		// Set the graphic pipeline state.
 		FGraphicsPipelineStateInitializer GraphicsPSOInit;
 		RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
@@ -114,7 +147,8 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
 		GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
 		GraphicsPSOInit.PrimitiveType = PT_TriangleList;
-		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GetVertexDeclarationFVector4();
+		//GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GetVertexDeclarationFVector4();
+		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = VertexDeclaration.VertexDeclarationRHI;
 		GraphicsPSOInit.BoundShaderState.VertexShaderRHI = GETSAFERHISHADER_VERTEX(*VertexShader);
 		GraphicsPSOInit.BoundShaderState.PixelShaderRHI = GETSAFERHISHADER_PIXEL(*PixelShader);
 		SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
@@ -125,8 +159,8 @@ static void DrawTestShaderRenderTarget_RenderThread(
 			OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY(), 1.f);
 
 		// Update shader uniform parameters.
-		VertexShader->SetParameters(RHICmdList, VertexShader->GetVertexShader(),MyColor);
-		PixelShader->SetParameters(RHICmdList, PixelShader->GetPixelShader(),MyColor);
+		VertexShader->SetParameters(RHICmdList, VertexShader->GetVertexShader(),MyColor,TextureRHI);
+		PixelShader->SetParameters(RHICmdList, PixelShader->GetPixelShader(),MyColor,TextureRHI);
 
 		// Draw grid.
 		/*
@@ -134,11 +168,15 @@ static void DrawTestShaderRenderTarget_RenderThread(
 		RHICmdList.DrawPrimitive(0, 2, 1);
 		*/
 		
-		FVector4 Vertices[4];
-		Vertices[0].Set(-1.0f, 1.0f, 0, 1.0f);
-		Vertices[1].Set(1.0f, 1.0f, 0, 1.0f);
-		Vertices[2].Set(-1.0f, -1.0f, 0, 1.0f);
-		Vertices[3].Set(1.0f, -1.0f, 0, 1.0f);
+		FTextureVertex Vertices[4];
+		Vertices[0].Position.Set(-1.0f, 1.0f, 0, 1.0f);
+		Vertices[1].Position.Set(1.0f, 1.0f, 0, 1.0f);
+		Vertices[2].Position.Set(-1.0f, -1.0f, 0, 1.0f);
+		Vertices[3].Position.Set(1.0f, -1.0f, 0, 1.0f);
+		Vertices[0].UV.Set(0,1.0f);
+		Vertices[1].UV.Set(1.0f,1.0f);
+		Vertices[2].UV.Set(0,0);
+		Vertices[3].UV.Set(1.0f,0.0);
 		static const uint16 Indices[6] =
 		{
 			0, 1, 2,
@@ -173,8 +211,7 @@ USimplePixelShaderBlueprintLibrary::USimplePixelShaderBlueprintLibrary(const FOb
 	: Super(ObjectInitializer)
 { }
 
-void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(UTextureRenderTarget2D* OutputRenderTarget,AActor* Ac, FLinearColor MyColor  
-)  
+void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget, FLinearColor MyColor,UTexture* MyTexture)
 {  
     check(IsInGameThread());  
  
@@ -184,13 +221,14 @@ void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(UTextureRend
     }  
  
     FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();  
-    UWorld* World = Ac->GetWorld();  
+	FTextureRHIParamRef TextureRHI = MyTexture->TextureReference.TextureReferenceRHI;
+	const UWorld* World = WorldContextObject->GetWorld();
     ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();  
     FName TextureRenderTargetName = OutputRenderTarget->GetFName();  
     ENQUEUE_RENDER_COMMAND(CaptureCommand)(  
-        [TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName](FRHICommandListImmediate& RHICmdList)  
+        [TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName,TextureRHI](FRHICommandListImmediate& RHICmdList)
         {  
-            DrawTestShaderRenderTarget_RenderThread(RHICmdList,TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor);  
+            DrawTestShaderRenderTarget_RenderThread(RHICmdList,TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor,TextureRHI);  
         }  
     );  
 }  
