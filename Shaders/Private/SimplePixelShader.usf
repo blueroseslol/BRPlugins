@@ -22,5 +22,20 @@ void MainPS(
 {
     OutColor = float4(TextureVal.Sample(TextureSampler, UV.xy).rgb, 1.0f);  
     //OutColor *= SimpleColor;
-	OutColor*=SimpleUniformStruct.Color4;
+	//OutColor*=SimpleUniformStruct.Color4;
+    switch (SimpleUniformStruct.ColorIndex)  
+    {  
+        case 0 :  
+            OutColor *= SimpleUniformStruct.Color1;  
+            break;  
+        case 1:  
+            OutColor *= SimpleUniformStruct.Color2;  
+            break;  
+        case 2:  
+            OutColor *= SimpleUniformStruct.Color3;  
+            break;  
+        case 3:  
+            OutColor *= SimpleUniformStruct.Color4;  
+            break;  
+    }  
 }

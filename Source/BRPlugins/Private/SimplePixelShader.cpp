@@ -19,6 +19,7 @@ SHADER_PARAMETER(FVector4, Color1)
 SHADER_PARAMETER(FVector4, Color2)
 SHADER_PARAMETER(FVector4, Color3)
 SHADER_PARAMETER(FVector4, Color4)
+SHADER_PARAMETER(uint32, ColorIndex)
 END_GLOBAL_SHADER_PARAMETER_STRUCT()
 
 IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FSimpleUniformStructParameters, "SimpleUniformStruct");
@@ -177,7 +178,8 @@ static void DrawTestShaderRenderTarget_RenderThread(
     ERHIFeatureLevel::Type FeatureLevel,  
     const FName TextureRenderTargetName,  
     const FLinearColor MyColor,
-	const FTextureRHIParamRef TextureRHI
+	const FTextureRHIParamRef TextureRHI,
+	const FSimpleUniformStruct UniformStruct
 )  
 {  
     check(IsInRenderingThread());  
@@ -227,10 +229,11 @@ static void DrawTestShaderRenderTarget_RenderThread(
 
 		// Update shader uniform parameters.
 		FSimpleUniformStructParameters Parameters;
-		Parameters.Color1 = FVector4(1.0f, 0.0f, 0.0f, 1.0f);
-		Parameters.Color2 = FVector4(0.0f, 1.0f, 0.0f, 1.0f);
-		Parameters.Color3 = FVector4(0.0f, 0.0f, 1.0f, 1.0f);
-		Parameters.Color4 = FVector4(1.0f, 0.0f, 1.0f, 1.0f);
+		Parameters.Color1 = UniformStruct.Color1;
+		Parameters.Color2 = UniformStruct.Color2;
+		Parameters.Color3 = UniformStruct.Color3;
+		Parameters.Color4 = UniformStruct.Color4;
+		Parameters.ColorIndex= UniformStruct.ColorIndex;
 
 		SetUniformBufferParameterImmediate(RHICmdList, PixelShader->GetPixelShader(), PixelShader->GetUniformBufferParameter<FSimpleUniformStructParameters>(), Parameters);
 
@@ -255,7 +258,7 @@ USimplePixelShaderBlueprintLibrary::USimplePixelShaderBlueprintLibrary(const FOb
 	: Super(ObjectInitializer)
 { }
 
-void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget, FLinearColor MyColor,UTexture* MyTexture)
+void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget, FLinearColor MyColor,UTexture* MyTexture,FSimpleUniformStruct UniformStruct)
 {  
     check(IsInGameThread());  
  
@@ -270,9 +273,9 @@ void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObjec
     ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();  
     FName TextureRenderTargetName = OutputRenderTarget->GetFName();  
     ENQUEUE_RENDER_COMMAND(CaptureCommand)(  
-        [TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName,TextureRHI](FRHICommandListImmediate& RHICmdList)
+        [TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName,TextureRHI, UniformStruct](FRHICommandListImmediate& RHICmdList)
         {  
-            DrawTestShaderRenderTarget_RenderThread(RHICmdList,TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor,TextureRHI);  
+            DrawTestShaderRenderTarget_RenderThread(RHICmdList,TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor,TextureRHI, UniformStruct);
         }  
     );  
 }  
