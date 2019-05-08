@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
@@ -33,4 +33,10 @@ class USimplePixelShaderBlueprintLibrary : public UBlueprintFunctionLibrary
 
 	UFUNCTION(BlueprintCallable, Category = "SimplePixelShader", meta = (WorldContext = "WorldContextObject"))
 	static void DrawTestShaderRenderTarget(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget,FLinearColor MyColor, UTexture* MyTexture,FSimpleUniformStruct UniformStruct);
+
+	/*
+		向UTexture2D写入数据
+	*/
+	UFUNCTION(BlueprintCallable, Category = "SimplePixelShader", meta = (WorldContext = "WorldContextObject"))
+	static void TextureWriting(UTexture2D* TextureToBeWrite);
 };

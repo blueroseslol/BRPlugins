@@ -1,4 +1,4 @@
-#include "SimplePixelShader.h"
+﻿#include "SimplePixelShader.h"
 
 #include "Classes/Engine/TextureRenderTarget2D.h"
 #include "Classes/Engine/World.h"
@@ -279,5 +279,46 @@ void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObjec
         }  
     );  
 }  
+
+void USimplePixelShaderBlueprintLibrary::TextureWriting(UTexture2D* TextureToBeWrite)
+{
+	check(IsInGameThread());
+
+	if (TextureToBeWrite == nullptr)return;
+	/*
+	//保存原式贴图设置以便之后恢复
+	TextureCompressionSettings OldCompressionSettings = TextureToBeWrite->CompressionSettings;
+	TextureMipGenSettings OldMipGenSettings = TextureToBeWrite->MipGenSettings;
+	uint8 OldSRGB = TextureToBeWrite->SRGB;
+	*/
+	//设置新的格式，不然Mipmap.BulkData.Lock(LOCK_READ_WRITE)会得到空指针
+	TextureToBeWrite->MipGenSettings = TextureMipGenSettings::TMGS_NoMipmaps;
+	TextureToBeWrite->CompressionSettings = TextureCompressionSettings::TC_VectorDisplacementmap;
+	TextureToBeWrite->SRGB = 0;
+	TextureToBeWrite->UpdateResource();
+
+	FTexture2DMipMap& Mipmap = TextureToBeWrite->PlatformData->Mips[0];
+	void* Data = Mipmap.BulkData.Lock(LOCK_READ_WRITE);
+
+	TArray<FColor> Colors;
+	const int PixelNum = TextureToBeWrite->PlatformData->SizeX*TextureToBeWrite->PlatformData->SizeY;
+	//Colors.Init(FColor::Red, PixelNum);
+
+	for (int i=0;i<PixelNum;++i)
+	{
+		Colors.Add(FColor::Red);
+	}
+
+	const int32 Stride=(int32)(sizeof(uint8) * 4);
+	FMemory::Memcpy(Data, Colors.GetData(), PixelNum*Stride);
+	Mipmap.BulkData.Unlock();
+/*
+	//恢复原本贴图设置
+	TextureToBeWrite->CompressionSettings = OldCompressionSettings;
+	TextureToBeWrite->MipGenSettings = OldMipGenSettings;
+	TextureToBeWrite->SRGB = OldSRGB;
+	TextureToBeWrite->UpdateResource();
+*/
+}
 
 #undef LOCTEXT_NAMESPACE  
