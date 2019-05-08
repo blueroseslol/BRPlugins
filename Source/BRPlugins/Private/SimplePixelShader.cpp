@@ -14,11 +14,19 @@
 
 #define LOCTEXT_NAMESPACE "SimplePixelShader"  
 
+BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(FSimpleUniformStructParameters, )
+SHADER_PARAMETER(FVector4, Color1)
+SHADER_PARAMETER(FVector4, Color2)
+SHADER_PARAMETER(FVector4, Color3)
+SHADER_PARAMETER(FVector4, Color4)
+END_GLOBAL_SHADER_PARAMETER_STRUCT()
+
+IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(FSimpleUniformStructParameters, "SimpleUniformStruct");
+
 struct FTextureVertex{
 	FVector4 Position;
 	FVector2D UV;
 };
-
 
 class FRectangleVertexBuffer : public FVertexBuffer
 {
@@ -218,6 +226,14 @@ static void DrawTestShaderRenderTarget_RenderThread(
 			OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY(), 1.f);
 
 		// Update shader uniform parameters.
+		FSimpleUniformStructParameters Parameters;
+		Parameters.Color1 = FVector4(1.0f, 0.0f, 0.0f, 1.0f);
+		Parameters.Color2 = FVector4(0.0f, 1.0f, 0.0f, 1.0f);
+		Parameters.Color3 = FVector4(0.0f, 0.0f, 1.0f, 1.0f);
+		Parameters.Color4 = FVector4(1.0f, 0.0f, 1.0f, 1.0f);
+
+		SetUniformBufferParameterImmediate(RHICmdList, PixelShader->GetPixelShader(), PixelShader->GetUniformBufferParameter<FSimpleUniformStructParameters>(), Parameters);
+
 		VertexShader->SetParameters(RHICmdList, VertexShader->GetVertexShader(),MyColor,TextureRHI);
 		PixelShader->SetParameters(RHICmdList, PixelShader->GetPixelShader(),MyColor,TextureRHI);
 

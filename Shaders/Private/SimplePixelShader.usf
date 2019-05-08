@@ -1,4 +1,5 @@
 #include "/Engine/Public/Platform.ush"
+#include "/Engine/Private/Common.ush"  
 
 float4 SimpleColor;
 Texture2D TextureVal;  
@@ -20,5 +21,6 @@ void MainPS(
     )
 {
     OutColor = float4(TextureVal.Sample(TextureSampler, UV.xy).rgb, 1.0f);  
-    OutColor *= SimpleColor;
+    //OutColor *= SimpleColor;
+	OutColor*=SimpleUniformStruct.Color4;
 }
