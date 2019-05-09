@@ -1,4 +1,4 @@
-// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
+﻿// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
@@ -31,6 +31,7 @@ public class BRPlugins : ModuleRules
 				"RHI",
 				"Engine",
 				"RenderCore",
+                "AssetTools"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

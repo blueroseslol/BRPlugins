@@ -11,6 +11,8 @@
 #include "Logging/MessageLog.h"
 #include "Internationalization/Internationalization.h"
 #include "Containers/DynamicRHIResourceArray.h"
+#include "AssetRegistryModule.h"
+
 
 #define LOCTEXT_NAMESPACE "SimplePixelShader"  
 
@@ -285,12 +287,12 @@ void USimplePixelShaderBlueprintLibrary::TextureWriting(UTexture2D* TextureToBeW
 	check(IsInGameThread());
 
 	if (TextureToBeWrite == nullptr)return;
-	/*
+	
 	//保存原式贴图设置以便之后恢复
 	TextureCompressionSettings OldCompressionSettings = TextureToBeWrite->CompressionSettings;
 	TextureMipGenSettings OldMipGenSettings = TextureToBeWrite->MipGenSettings;
 	uint8 OldSRGB = TextureToBeWrite->SRGB;
-	*/
+	
 	//设置新的格式，不然Mipmap.BulkData.Lock(LOCK_READ_WRITE)会得到空指针
 	TextureToBeWrite->MipGenSettings = TextureMipGenSettings::TMGS_NoMipmaps;
 	TextureToBeWrite->CompressionSettings = TextureCompressionSettings::TC_VectorDisplacementmap;
@@ -312,13 +314,69 @@ void USimplePixelShaderBlueprintLibrary::TextureWriting(UTexture2D* TextureToBeW
 	const int32 Stride=(int32)(sizeof(uint8) * 4);
 	FMemory::Memcpy(Data, Colors.GetData(), PixelNum*Stride);
 	Mipmap.BulkData.Unlock();
-/*
+
 	//恢复原本贴图设置
 	TextureToBeWrite->CompressionSettings = OldCompressionSettings;
 	TextureToBeWrite->MipGenSettings = OldMipGenSettings;
 	TextureToBeWrite->SRGB = OldSRGB;
+
+	TextureToBeWrite->Source.Init(TextureToBeWrite->PlatformData->SizeX, TextureToBeWrite->PlatformData->SizeY, 1, 1, ETextureSourceFormat::TSF_BGRA8, (uint8*)Colors.GetData());
 	TextureToBeWrite->UpdateResource();
-*/
+}
+
+void USimplePixelShaderBlueprintLibrary::CreateTexture(const FString& TextureName,const FString& PackageName)
+{
+	int32 TextureWidth = 1024;
+	int32 TextureHeight = 1024;
+
+	FString AssetPath = TEXT("/Game/")+ PackageName+ TEXT("/");
+	AssetPath += TextureName;
+	UPackage* Package = CreatePackage(NULL, *AssetPath);
+	Package->FullyLoad();
+
+	UTexture2D* NewTexture = NewObject<UTexture2D>(Package, *TextureName, RF_Public | RF_Standalone | RF_MarkAsRootSet);
+
+	NewTexture->AddToRoot();				// This line prevents garbage collection of the texture
+	NewTexture->PlatformData = new FTexturePlatformData();	// Then we initialize the PlatformData
+	NewTexture->PlatformData->SizeX = TextureWidth;
+	NewTexture->PlatformData->SizeY = TextureHeight;
+	NewTexture->PlatformData->NumSlices = 1;
+	NewTexture->PlatformData->PixelFormat = EPixelFormat::PF_B8G8R8A8;
+
+	uint8* Pixels = new uint8[TextureWidth * TextureHeight * 4];
+	for (int32 y = 0; y < TextureHeight; y++)
+	{
+		for (int32 x = 0; x < TextureWidth; x++)
+		{
+			int32 curPixelIndex = ((y * TextureWidth) + x);
+			Pixels[4 * curPixelIndex] = 100;
+			Pixels[4 * curPixelIndex + 1] = 50;
+			Pixels[4 * curPixelIndex + 2] = 20;
+			Pixels[4 * curPixelIndex + 3] = 255;
+		}
+	}
+
+	// Allocate first mipmap.
+	FTexture2DMipMap* Mip = new(NewTexture->PlatformData->Mips) FTexture2DMipMap();
+	Mip->SizeX = TextureWidth;
+	Mip->SizeY = TextureHeight;
+
+	// Lock the texture so it can be modified
+	Mip->BulkData.Lock(LOCK_READ_WRITE);
+	uint8* TextureData = (uint8*)Mip->BulkData.Realloc(TextureWidth * TextureHeight * 4);
+	FMemory::Memcpy(TextureData, Pixels, sizeof(uint8) * TextureHeight * TextureWidth * 4);
+	Mip->BulkData.Unlock();
+
+	NewTexture->Source.Init(TextureWidth, TextureHeight, 1, 1, ETextureSourceFormat::TSF_BGRA8, Pixels);
+
+	NewTexture->UpdateResource();
+	Package->MarkPackageDirty();
+	FAssetRegistryModule::AssetCreated(NewTexture);
+
+	FString PackageFileName = FPackageName::LongPackageNameToFilename(AssetPath, FPackageName::GetAssetPackageExtension());
+	bool bSaved = UPackage::SavePackage(Package, NewTexture, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone, *PackageFileName, GError, nullptr, true, true, SAVE_NoError);
+
+	delete[] Pixels;
 }
 
 #undef LOCTEXT_NAMESPACE  

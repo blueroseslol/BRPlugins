@@ -39,4 +39,8 @@ class USimplePixelShaderBlueprintLibrary : public UBlueprintFunctionLibrary
 	*/
 	UFUNCTION(BlueprintCallable, Category = "SimplePixelShader", meta = (WorldContext = "WorldContextObject"))
 	static void TextureWriting(UTexture2D* TextureToBeWrite);
+
+
+	UFUNCTION(BlueprintCallable, Category = "SimplePixelShader", meta = (WorldContext = "WorldContextObject"))
+	static void CreateTexture(const FString& TextureName, const FString& PackageName);
 };
