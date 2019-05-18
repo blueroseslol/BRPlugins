@@ -34,6 +34,8 @@ class USimplePixelShaderBlueprintLibrary : public UBlueprintFunctionLibrary
 	UFUNCTION(BlueprintCallable, Category = "SimplePixelShader", meta = (WorldContext = "WorldContextObject"))
 	static void DrawTestShaderRenderTarget(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget,FLinearColor MyColor, UTexture* MyTexture,FSimpleUniformStruct UniformStruct);
 
+	UFUNCTION(BlueprintCallable, Category = "SimplePixelShader", meta = (WorldContext = "WorldContextObject"))
+	static void UseComputeShader(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget, FSimpleUniformStruct UniformStruct);
 	/*
 		向UTexture2D写入数据
 	*/

@@ -171,6 +171,69 @@ public:
 	}
 };
 
+
+class FSimpleComputeShader : public FGlobalShader
+{
+	DECLARE_SHADER_TYPE(FSimpleComputeShader, Global);
+
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	{
+		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+	}
+
+	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
+	{
+		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+		OutEnvironment.CompilerFlags.Add(CFLAG_StandardOptimization);
+	}
+
+public:
+	FSimpleComputeShader() {}
+	FSimpleComputeShader(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
+		: FGlobalShader(Initializer)
+	{
+		OutTexture.Bind(Initializer.ParameterMap, TEXT("OutTexture"));
+	}
+
+	virtual bool Serialize(FArchive& Ar) override
+	{
+		bool bShaderHasOutdatedParameters = FGlobalShader::Serialize(Ar);
+		Ar << OutTexture;
+		return bShaderHasOutdatedParameters;
+	}
+
+	void SetParameters(FRHICommandList& RHICmdList, FUnorderedAccessViewRHIParamRef InOutUAV, FSimpleUniformStruct UniformStruct)
+	{
+		FComputeShaderRHIParamRef ComputeShaderRHI = GetComputeShader();
+		//		SetShaderValue(RHICmdList, ComputeShaderRHI, TargetHeight, InTargetHeight);
+		//		SetTextureParameter(RHICmdList, ComputeShaderRHI, SrcTexture, InSrcTexture);
+		if (OutTexture.IsBound())
+			RHICmdList.SetUAVParameter(ComputeShaderRHI, OutTexture.GetBaseIndex(), InOutUAV);
+
+		FSimpleUniformStructParameters ShaderStructData;
+		ShaderStructData.Color1 = UniformStruct.Color1;
+		ShaderStructData.Color2 = UniformStruct.Color2;
+		ShaderStructData.Color3 = UniformStruct.Color3;
+		ShaderStructData.Color4 = UniformStruct.Color4;
+		ShaderStructData.ColorIndex = UniformStruct.ColorIndex;
+
+		SetUniformBufferParameterImmediate(RHICmdList, GetComputeShader(), GetUniformBufferParameter<FSimpleUniformStructParameters>(), ShaderStructData);
+	}
+
+	/*
+	* Unbinds any buffers that have been bound.
+	*/
+	void UnbindBuffers(FRHICommandList& RHICmdList)
+	{
+		FComputeShaderRHIParamRef ComputeShaderRHI = GetComputeShader();
+		if (OutTexture.IsBound())
+			RHICmdList.SetUAVParameter(ComputeShaderRHI, OutTexture.GetBaseIndex(), FUnorderedAccessViewRHIParamRef());
+	}
+protected:
+	FShaderResourceParameter OutTexture;
+};
+
+IMPLEMENT_SHADER_TYPE(, FSimpleComputeShader, TEXT("/Plugin/BRPlugins/Private/SimpleComputeShader.usf"), TEXT("MainCS"), SF_Compute);
 IMPLEMENT_SHADER_TYPE(, FSimplePixelShaderVS, TEXT("/Plugin/BRPlugins/Private/SimplePixelShader.usf"), TEXT("MainVS"), SF_Vertex)
 IMPLEMENT_SHADER_TYPE(, FSimplePixelShaderPS, TEXT("/Plugin/BRPlugins/Private/SimplePixelShader.usf"), TEXT("MainPS"), SF_Pixel)
 
@@ -178,7 +241,7 @@ static void DrawTestShaderRenderTarget_RenderThread(
     FRHICommandListImmediate& RHICmdList,   
     FTextureRenderTargetResource* OutputRenderTargetResource,  
     ERHIFeatureLevel::Type FeatureLevel,  
-    const FName TextureRenderTargetName,  
+//    const FName TextureRenderTargetName,  
     const FLinearColor MyColor,
 	const FTextureRHIParamRef TextureRHI,
 	const FSimpleUniformStruct UniformStruct
@@ -187,21 +250,12 @@ static void DrawTestShaderRenderTarget_RenderThread(
     check(IsInRenderingThread());  
  
 #if WANTS_DRAW_MESH_EVENTS  
-    FString EventName;  
-    TextureRenderTargetName.ToString(EventName);  
-    SCOPED_DRAW_EVENTF(RHICmdList, SceneCapture, TEXT("ShaderTest %s"), *EventName);  
+	SCOPED_DRAW_EVENTF(RHICmdList, SceneCapture, TEXT("SimplePixelShaderPassTest"));
 #else  
     SCOPED_DRAW_EVENT(RHICmdList, DrawTestShaderRenderTarget_RenderThread);  
 #endif  
 	FRHIRenderPassInfo RPInfo(OutputRenderTargetResource->GetRenderTargetTexture(), ERenderTargetActions::DontLoad_Store, OutputRenderTargetResource->TextureRHI);
-	RHICmdList.BeginRenderPass(RPInfo, TEXT("DrawUVDisplacement"));
-	
-		FIntPoint DisplacementMapResolution(OutputRenderTargetResource->GetSizeX(), OutputRenderTargetResource->GetSizeY());
-
-		// Update viewport.
-		RHICmdList.SetViewport(
-			0, 0, 0.f,
-			DisplacementMapResolution.X, DisplacementMapResolution.Y, 1.f);
+	RHICmdList.BeginRenderPass(RPInfo, TEXT("SimplePixelShaderPass"));
 
 		// Get shaders.
 		TShaderMap<FGlobalShaderType>* GlobalShaderMap = GetGlobalShaderMap(FeatureLevel);
@@ -252,15 +306,41 @@ static void DrawTestShaderRenderTarget_RenderThread(
 			/*StartIndex=*/ 0,
 			/*NumPrimitives=*/ 2,
 			/*NumInstances=*/ 1);
-		
+
 	RHICmdList.EndRenderPass();
 }  
+
+static void UseComputeShader_RenderThread(
+	FRHICommandListImmediate& RHICmdList,
+	FTextureRenderTargetResource* OutputRenderTargetResource,
+	FSimpleUniformStruct UniformStruct,
+	ERHIFeatureLevel::Type FeatureLevel
+)
+{
+	check(IsInRenderingThread());
+
+	TShaderMapRef<FSimpleComputeShader> ComputeShader(GetGlobalShaderMap(FeatureLevel));
+	RHICmdList.SetComputeShader(ComputeShader->GetComputeShader());
+
+	//ComputeShader->SetSurfaces(RHICmdList,)  
+	int32 SizeX = OutputRenderTargetResource->GetSizeX();
+	int32 SizeY = OutputRenderTargetResource->GetSizeY();
+	FRHIResourceCreateInfo CreateInfo;
+
+	FTexture2DRHIRef Texture = RHICreateTexture2D(SizeX, SizeY, PF_A32B32G32R32F, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
+	FUnorderedAccessViewRHIRef TextureUAV = RHICreateUnorderedAccessView(Texture);
+	ComputeShader->SetParameters(RHICmdList, TextureUAV, UniformStruct);
+	DispatchComputeShader(RHICmdList, *ComputeShader, SizeX / 32, SizeY / 32, 1);
+	ComputeShader->UnbindBuffers(RHICmdList);
+
+	DrawTestShaderRenderTarget_RenderThread(RHICmdList, OutputRenderTargetResource, FeatureLevel, FLinearColor(), Texture, UniformStruct);
+}
  
 USimplePixelShaderBlueprintLibrary::USimplePixelShaderBlueprintLibrary(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 { }
 
-void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget, FLinearColor MyColor,UTexture* MyTexture,FSimpleUniformStruct UniformStruct)
+void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget, FLinearColor MyColor, UTexture* MyTexture, FSimpleUniformStruct UniformStruct)
 {  
     check(IsInGameThread());  
  
@@ -273,11 +353,11 @@ void USimplePixelShaderBlueprintLibrary::DrawTestShaderRenderTarget(const UObjec
 	FTextureRHIParamRef TextureRHI = MyTexture->TextureReference.TextureReferenceRHI;
 	const UWorld* World = WorldContextObject->GetWorld();
     ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();  
-    FName TextureRenderTargetName = OutputRenderTarget->GetFName();  
+  /*  FName TextureRenderTargetName = OutputRenderTarget->GetFName(); */ 
     ENQUEUE_RENDER_COMMAND(CaptureCommand)(  
-        [TextureRenderTargetResource, FeatureLevel, MyColor, TextureRenderTargetName,TextureRHI, UniformStruct](FRHICommandListImmediate& RHICmdList)
+        [TextureRenderTargetResource, FeatureLevel, MyColor,TextureRHI, UniformStruct](FRHICommandListImmediate& RHICmdList)
         {  
-            DrawTestShaderRenderTarget_RenderThread(RHICmdList,TextureRenderTargetResource, FeatureLevel, TextureRenderTargetName, MyColor,TextureRHI, UniformStruct);
+            DrawTestShaderRenderTarget_RenderThread(RHICmdList,TextureRenderTargetResource, FeatureLevel, MyColor,TextureRHI, UniformStruct);
         }  
     );  
 }  
@@ -357,7 +437,8 @@ void USimplePixelShaderBlueprintLibrary::CreateTexture(const FString& TextureNam
 	}
 
 	// Allocate first mipmap.
-	FTexture2DMipMap* Mip = new(NewTexture->PlatformData->Mips) FTexture2DMipMap();
+	FTexture2DMipMap* Mip = new FTexture2DMipMap();
+	NewTexture->PlatformData->Mips.Add(Mip);
 	Mip->SizeX = TextureWidth;
 	Mip->SizeY = TextureHeight;
 
@@ -377,6 +458,27 @@ void USimplePixelShaderBlueprintLibrary::CreateTexture(const FString& TextureNam
 	bool bSaved = UPackage::SavePackage(Package, NewTexture, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone, *PackageFileName, GError, nullptr, true, true, SAVE_NoError);
 
 	delete[] Pixels;
+}
+
+void USimplePixelShaderBlueprintLibrary::UseComputeShader(const UObject* WorldContextObject, UTextureRenderTarget2D* OutputRenderTarget,FSimpleUniformStruct UniformStruct)
+{
+	check(IsInGameThread());
+
+	FTextureRenderTargetResource* TextureRenderTargetResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
+	const UWorld* World = WorldContextObject->GetWorld();
+	ERHIFeatureLevel::Type FeatureLevel = World->Scene->GetFeatureLevel();
+
+	ENQUEUE_RENDER_COMMAND(CaptureCommand)(
+		[TextureRenderTargetResource, FeatureLevel, UniformStruct](FRHICommandListImmediate& RHICmdList)
+	{
+		UseComputeShader_RenderThread
+		(
+			RHICmdList,
+			TextureRenderTargetResource,
+			UniformStruct,
+			FeatureLevel
+		);
+	});
 }
 
 #undef LOCTEXT_NAMESPACE  
