@@ -6,7 +6,7 @@
 #include "SimplePixelShader.generated.h"
 
 USTRUCT(BlueprintType, meta = (ScriptName = "SimplePixelShaderTest"))
-struct FSimpleUniformStruct 
+struct FSimpleUniformStruct
 {
 	GENERATED_USTRUCT_BODY()
 
