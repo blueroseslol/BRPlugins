@@ -14,9 +14,9 @@ class UStrokeStaticMeshComponent : public UStaticMeshComponent
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
 	//~ End UPrimitiveComponent Interface
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MultiplePass")
 	UMaterialInterface* SecondPassMaterial = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MultiplePass")
 	bool NeedSecondPass=false;
 };

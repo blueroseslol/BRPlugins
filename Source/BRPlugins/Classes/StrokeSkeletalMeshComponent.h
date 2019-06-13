@@ -16,9 +16,9 @@ class UStrokeSkeletalMeshComponent : public USkeletalMeshComponent
 
 	//virtual UMaterialInterface* GetMaterial(int32 MaterialIndex) const override;
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MultiplePass")
 	UMaterialInterface* SecondPassMaterial = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MultiplePass")
 	bool NeedSecondPass=false;
 };
