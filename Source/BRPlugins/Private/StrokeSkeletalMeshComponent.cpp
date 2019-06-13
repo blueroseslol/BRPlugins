@@ -27,17 +27,8 @@ void UStrokeSkeletalMeshComponent::GetUsedMaterials(TArray<UMaterialInterface*>&
 		}
 		if (NeedSecondPass)
 		{
-			for (int i = 0; i < SkeletalMesh->Materials.Num(); ++i)
-			{
-				if (SkeletalMesh->Materials[i].MaterialSlotName == FName("NAME_Stroke"))
-				{
-					SkeletalMesh->Materials.RemoveAt(i);
-				}
-			}
-			
-			SkeletalMesh->Materials.Add(FSkeletalMaterial(SecondPassMaterial,true,false,FName("NAME_Stroke")));
-			SkeletalMesh->UpdateUVChannelData(false);
 			OutMaterials.Add(SecondPassMaterial);
+			SkeletalMesh->UpdateUVChannelData(false);
 		}
 	}
 

@@ -4,7 +4,8 @@
 #include "Engine/Public/SkeletalRenderPublic.h"
 #define LOCTEXT_NAMESPACE "StrokeSkeletalMeshSceneProxy"
 
-FStrokeSkeletalMeshSceneProxy::FStrokeSkeletalMeshSceneProxy(const USkinnedMeshComponent* Component, FSkeletalMeshRenderData* InSkelMeshRenderData):FSkeletalMeshSceneProxy(Component,InSkelMeshRenderData),ComponentPtr(Component)
+FStrokeSkeletalMeshSceneProxy::FStrokeSkeletalMeshSceneProxy(const USkinnedMeshComponent* Component, FSkeletalMeshRenderData* InSkelMeshRenderData):
+	FSkeletalMeshSceneProxy(Component,InSkelMeshRenderData),ComponentPtr(Component)
 {
 }
 
@@ -163,13 +164,9 @@ void FStrokeSkeletalMeshSceneProxy::GetDynamicMeshElements(const TArray<const FS
 				}
 				Info.Material = StrokeSkeletalMeshComponent->SecondPassMaterial;
 				GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, Info, true, Collector);
-				//GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, SectionElementInfo, true, Collector);
 			}
-
-			
 		}
 	}
-
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 	for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
 	{
@@ -211,5 +208,4 @@ void FStrokeSkeletalMeshSceneProxy::GetDynamicMeshElements(const TArray<const FS
 	}
 #endif
 }
-
 #undef LOCTEXT_NAMESPACE
