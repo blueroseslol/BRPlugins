@@ -101,6 +101,7 @@ void FStrokeSkeletalMeshSceneProxy::GetDynamicMeshElements(const TArray<const FS
 	{
 		return;
 	}
+	MeshObject->PreGDMECallback(ViewFamily.Scene->GetGPUSkinCache(), ViewFamily.FrameNumber);
 
 	const FEngineShowFlags& EngineShowFlags = ViewFamily.EngineShowFlags;
 
