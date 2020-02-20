@@ -7,7 +7,7 @@ public class BRPlugins : ModuleRules
 	public BRPlugins(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
+
 		PublicIncludePaths.AddRange(
 			new string[] {
 				// ... add public include paths required here ...
@@ -31,7 +31,10 @@ public class BRPlugins : ModuleRules
 				"RHI",
 				"Engine",
 				"RenderCore",
-                "AssetTools"
+                "AssetTools",
+				"Slate",
+                "SlateCore",
+				"UMG"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

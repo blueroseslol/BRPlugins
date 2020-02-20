@@ -105,7 +105,7 @@ void FStrokeStaticMeshSceneProxy::DrawStaticElements(FStaticPrimitiveDrawInterfa
 
 				if (GUseShadowIndexBuffer && LODModel.bHasDepthOnlyIndices)
 				{
-					const FLODInfo& ProxyLODInfo = LODs[LODIndex];
+					const FLODInfo& LODInfo = LODs[LODIndex];
 
 					// The shadow-only mesh can be used only if all elements cast shadows and use opaque materials with no vertex modification.
 					// In some cases (e.g. LPV) we don't want the optimization
@@ -118,7 +118,7 @@ void FStrokeStaticMeshSceneProxy::DrawStaticElements(FStaticPrimitiveDrawInterfa
 
 					for (int32 SectionIndex = 0; bSafeToUseUnifiedMesh && SectionIndex < LODModel.Sections.Num(); SectionIndex++)
 					{
-						const FMaterial* Material = ProxyLODInfo.Sections[SectionIndex].Material->GetRenderProxy()->GetMaterial(FeatureLevel);
+						const FMaterial* Material = LODInfo.Sections[SectionIndex].Material->GetRenderProxy()->GetMaterial(FeatureLevel);
 						// no support for stateless dithered LOD transitions for movable meshes
 						bAnySectionUsesDitheredLODTransition = bAnySectionUsesDitheredLODTransition || (!bIsMovable && Material->IsDitheredLODTransition());
 						bAllSectionsUseDitheredLODTransition = bAllSectionsUseDitheredLODTransition && (!bIsMovable && Material->IsDitheredLODTransition());
