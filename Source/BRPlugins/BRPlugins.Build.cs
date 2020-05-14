@@ -44,8 +44,9 @@ public class BRPlugins : ModuleRules
 			new string[]
 			{
 				 "Projects",
-				// ... add private dependencies that you statically link with here ...	
-			}
+				// ... add private dependencies that you statically link with here ...
+                "AnimationModifiers"
+            }
 			);
 		
 		
