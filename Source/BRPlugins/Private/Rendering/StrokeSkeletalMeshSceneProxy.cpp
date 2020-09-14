@@ -1,4 +1,4 @@
-﻿#include "StrokeSkeletalMeshSceneProxy.h"
+﻿#include "Rendering/StrokeSkeletalMeshSceneProxy.h"
 #include "Engine/Public/SkeletalMeshTypes.h"
 #include "Engine/Public/TessellationRendering.h"
 #include "Engine/Public/SkeletalRenderPublic.h"
