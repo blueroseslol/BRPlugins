@@ -17,12 +17,11 @@ void MainVS(
 
 void MainPS(
     in float2 UV : TEXCOORD0, 
+    in float4 Position : SV_POSITION,
     out float4 OutColor : SV_Target0
     )
 {
     OutColor = float4(TextureVal.Sample(TextureSampler, UV.xy).rgb, 1.0f);  
-    //OutColor *= SimpleColor;
-	//OutColor*=SimpleUniformStruct.Color4;
     switch (SimpleUniformStruct.ColorIndex)  
     {  
         case 0 :  
@@ -37,5 +36,5 @@ void MainPS(
         case 3:  
             OutColor *= SimpleUniformStruct.Color4;  
             break;  
-    }  
+    } 
 }
