@@ -1,5 +1,5 @@
-﻿#include "StrokeStaticMeshComponent.h"
-#include "StrokeStaticMeshSceneProxy.h"
+﻿#include "Rendering/StrokeStaticMeshComponent.h"
+#include "Rendering/StrokeStaticMeshSceneProxy.h"
 #include "Engine/Public/Rendering/SkeletalMeshRenderData.h"
 #include "Engine/Public/SkeletalRenderPublic.h"
 #define LOCTEXT_NAMESPACE "StrokeSkeletalMeshComponent"

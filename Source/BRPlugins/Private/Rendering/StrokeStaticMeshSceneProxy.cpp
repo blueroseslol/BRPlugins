@@ -1,4 +1,4 @@
-﻿#include "StrokeStaticMeshSceneProxy.h"
+﻿#include "Rendering/StrokeStaticMeshSceneProxy.h"
 #define LOCTEXT_NAMESPACE "StrokeStaticMeshSceneProxy"
 
 static bool GUseShadowIndexBuffer = true;

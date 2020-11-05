@@ -34,7 +34,8 @@ public class BRPlugins : ModuleRules
                 "AssetTools",
 				"Slate",
                 "SlateCore",
-				"UMG"
+				"UMG",
+                "MaterialShaderQualitySettings"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

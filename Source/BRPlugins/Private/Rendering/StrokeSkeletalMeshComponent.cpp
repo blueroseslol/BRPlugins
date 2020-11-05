@@ -1,5 +1,5 @@
-﻿#include "StrokeSkeletalMeshComponent.h"
-#include "StrokeSkeletalMeshSceneProxy.h"
+﻿#include "Rendering/StrokeSkeletalMeshComponent.h"
+#include "Rendering/StrokeSkeletalMeshSceneProxy.h"
 #include "Engine/Public/Rendering/SkeletalMeshRenderData.h"
 #include "Engine/Public/SkeletalRenderPublic.h"
 //#include "Engine/Classes/PhysicsEngine/PhysicsAsset.h"

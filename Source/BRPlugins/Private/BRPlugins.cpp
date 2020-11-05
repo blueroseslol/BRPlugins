@@ -11,7 +11,7 @@
 void FBRPluginsModule::StartupModule()
 {
 	FString PluginShaderDir = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("BRPlugins"))->GetBaseDir(), TEXT("Shaders"));
-	AddShaderSourceDirectoryMapping(TEXT("/Plugin/BRPlugins"), PluginShaderDir);
+	AddShaderSourceDirectoryMapping(TEXT("/BRPlugins"), PluginShaderDir);
 }
 
 void FBRPluginsModule::ShutdownModule()

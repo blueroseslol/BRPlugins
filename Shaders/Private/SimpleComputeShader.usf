@@ -52,7 +52,21 @@ void MainCS(uint3 ThreadId : SV_DispatchThreadID)
     float3 minimized = min(powered, 1.0);
     float4 outputColor = float4(minimized, 1.0);
 
+    switch (SimpleUniformStruct.ColorIndex)  
+    {  
+        // case 0 :  
+        //     OutColor *= SimpleUniformStruct.Color1;  
+        //     break;  
+        case 1:  
+            outputColor *= SimpleUniformStruct.Color2;  
+            break;  
+        case 2:  
+            outputColor *= SimpleUniformStruct.Color3;  
+            break;  
+        case 3:  
+            outputColor *= SimpleUniformStruct.Color4;  
+            break;  
+    }  
+
     OutTexture[ThreadId.xy] = outputColor;
-
-
 }
