@@ -3,6 +3,7 @@
 
 #include "PipelineStateCache.h"
 #include "GlobalShader.h"
+#include "ShaderCompilerCore.h"
 
 namespace SimpleRenderingExample
 {
@@ -150,7 +151,7 @@ namespace SimpleRenderingExample
 	#else  
 		SCOPED_DRAW_EVENT(RHIImmCmdList, GlobalShaderDraw);
 	#endif  
-		RHIImmCmdList.TransitionResource(EResourceTransitionAccess::EWritable, RenderTargetRHI);
+		RHIImmCmdList.TransitionResource(ERHIAccess::EWritable, RenderTargetRHI);
 
 		FRHIRenderPassInfo RPInfo(RenderTargetRHI, ERenderTargetActions::DontLoad_Store, RenderTargetRHI);
 		RHIImmCmdList.BeginRenderPass(RPInfo, TEXT("SimplePixelShaderPass"));

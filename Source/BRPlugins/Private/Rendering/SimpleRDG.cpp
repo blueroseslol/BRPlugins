@@ -91,8 +91,9 @@ namespace SimpleRenderingExample
 	{
 		check(IsInRenderingThread());
 
-		//Create PooledRenderTarget
-		FPooledRenderTargetDesc RenderTargetDesc = FPooledRenderTargetDesc::Create2DDesc(RenderTargetRHI->GetSizeXY(),RenderTargetRHI->GetFormat(), FClearValueBinding::Black, TexCreate_None, TexCreate_RenderTargetable | TexCreate_ShaderResource | TexCreate_UAV, false);
+		//Create RenderTargetDesc
+		const FRDGTextureDesc& RenderTargetDesc = FRDGTextureDesc::Create2D(RenderTargetRHI->GetSizeXY(),RenderTargetRHI->GetFormat(), FClearValueBinding::Black, TexCreate_RenderTargetable | TexCreate_ShaderResource | TexCreate_UAV);
+		
 		TRefCountPtr<IPooledRenderTarget> PooledRenderTarget;
 
 		//RDG Begin
@@ -147,7 +148,7 @@ namespace SimpleRenderingExample
 		check(IsInRenderingThread());
 
 		//Create PooledRenderTarget
-		FPooledRenderTargetDesc RenderTargetDesc = FPooledRenderTargetDesc::Create2DDesc(RenderTargetRHI->GetSizeXY(),RenderTargetRHI->GetFormat(), FClearValueBinding::Black, TexCreate_None, TexCreate_RenderTargetable | TexCreate_ShaderResource | TexCreate_UAV, false);
+		const FRDGTextureDesc& RenderTargetDesc = FRDGTextureDesc::Create2D(RenderTargetRHI->GetSizeXY(), RenderTargetRHI->GetFormat(), FClearValueBinding::Black,  TexCreate_RenderTargetable | TexCreate_ShaderResource | TexCreate_UAV);
 		TRefCountPtr<IPooledRenderTarget> PooledRenderTarget;
 
 		//RDG Begin
