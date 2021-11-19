@@ -12,12 +12,12 @@ UStrokeStaticMeshComponent::UStrokeStaticMeshComponent(const FObjectInitializer&
 
 void UStrokeStaticMeshComponent::GetUsedMaterials(TArray<UMaterialInterface*>& OutMaterials, bool bGetDebugMaterials /*= false*/) const
 {
-	if (GetStaticMesh() && GetStaticMesh()->RenderData)
+	if (GetStaticMesh() && GetStaticMesh()->GetRenderData())
 	{
 		TMap<int32, UMaterialInterface*> MapOfMaterials;
-		for (int32 LODIndex = 0; LODIndex < GetStaticMesh()->RenderData->LODResources.Num(); LODIndex++)
+		for (int32 LODIndex = 0; LODIndex < GetStaticMesh()->GetRenderData()->LODResources.Num(); LODIndex++)
 		{
-			FStaticMeshLODResources& LODResources = GetStaticMesh()->RenderData->LODResources[LODIndex];
+			FStaticMeshLODResources& LODResources = GetStaticMesh()->GetRenderData()->LODResources[LODIndex];
 			int32 MaterialNum = 0;
 			for (int32 SectionIndex = 0; SectionIndex < LODResources.Sections.Num(); SectionIndex++)
 			{
@@ -68,13 +68,13 @@ void UStrokeStaticMeshComponent::GetUsedMaterials(TArray<UMaterialInterface*>& O
 
 FPrimitiveSceneProxy* UStrokeStaticMeshComponent::CreateSceneProxy()
 {
-	if (GetStaticMesh() == nullptr || GetStaticMesh()->RenderData == nullptr)
+	if (GetStaticMesh() == nullptr || GetStaticMesh()->GetRenderData() == nullptr)
 	{
 		return nullptr;
 	}
 
-	const TIndirectArray<FStaticMeshLODResources>& LODResources = GetStaticMesh()->RenderData->LODResources;
-	if (LODResources.Num() == 0 || LODResources[FMath::Clamp<int32>(GetStaticMesh()->MinLOD.Default, 0, LODResources.Num() - 1)].VertexBuffers.StaticMeshVertexBuffer.GetNumVertices() == 0)
+	const TIndirectArray<FStaticMeshLODResources>& LODResources = GetStaticMesh()->GetRenderData()->LODResources;
+	if (LODResources.Num() == 0 || LODResources[FMath::Clamp<int32>(GetStaticMesh()->GetMinLOD().Default, 0, LODResources.Num() - 1)].VertexBuffers.StaticMeshVertexBuffer.GetNumVertices() == 0)
 	{
 		return nullptr;
 	}

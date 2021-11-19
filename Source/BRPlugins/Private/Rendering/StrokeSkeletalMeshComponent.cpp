@@ -17,7 +17,7 @@ void UStrokeSkeletalMeshComponent::GetUsedMaterials(TArray<UMaterialInterface*>&
 	if (SkeletalMesh)
 	{
 		// The max number of materials used is the max of the materials on the skeletal mesh and the materials on the mesh component
-		const int32 NumMaterials = FMath::Max(SkeletalMesh->Materials.Num(), OverrideMaterials.Num());
+		const int32 NumMaterials = FMath::Max(SkeletalMesh->GetMaterials().Num(), OverrideMaterials.Num());
 		for (int32 MatIdx = 0; MatIdx < NumMaterials; ++MatIdx)
 		{
 			// GetMaterial will determine the correct material to use for this index.  
@@ -53,13 +53,13 @@ FPrimitiveSceneProxy* UStrokeSkeletalMeshComponent::CreateSceneProxy()
 
 	// Only create a scene proxy for rendering if properly initialized
 	if (SkelMeshRenderData &&
-		SkelMeshRenderData->LODRenderData.IsValidIndex(PredictedLODLevel) &&
+		SkelMeshRenderData->LODRenderData.IsValidIndex(GetPredictedLODLevel()) &&
 		!bHideSkin &&
 		MeshObject)
 	{
 		// Only create a scene proxy if the bone count being used is supported, or if we don't have a skeleton (this is the case with destructibles)
 		int32 MaxBonesPerChunk = SkelMeshRenderData->GetMaxBonesPerSection();
-		int32 MaxSupportedNumBones = MeshObject->IsCPUSkinned() ? MAX_int32 : GetFeatureLevelMaxNumberOfBones(SceneFeatureLevel);
+		int32 MaxSupportedNumBones = MeshObject->IsCPUSkinned() ? MAX_int32 : FGPUBaseSkinVertexFactory::GetMaxGPUSkinBones();
 		if (MaxBonesPerChunk <= MaxSupportedNumBones)
 		{
 			Result = ::new FStrokeSkeletalMeshSceneProxy(this, SkelMeshRenderData);

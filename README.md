@@ -3,7 +3,11 @@
 在Ue4项目目录下的Plugins文件夹（如果没有就新建一个）中新建BRPlugins文件夹，最后将本仓库clone至此即可。
 
 ## 日志
-### 2020.1.28
+### 2021.11.19
+1. 4.27 SSpinBox控件不再导出，所以删除了IntegerSpinBox。
+2. 更新API。
+
+### 2021.1.28
 1. 增加IntegerSpinBox控件
 
 ### 2020.12.11
