@@ -159,12 +159,13 @@ void FStrokeSkeletalMeshSceneProxy::GetDynamicMeshElements(const TArray<const FS
 			
 			//轮廓
 			if (StrokeSkeletalMeshComponent->NeedSecondPass) {
-				FSectionElementInfo Info = FSectionElementInfo(SectionElementInfo);
+				// FSectionElementInfo Info = FSectionElementInfo(SectionElementInfo);
+				TSharedPtr<FSectionElementInfo> Info=MakeShared<FSectionElementInfo>(FSectionElementInfo(SectionElementInfo));
 				if (StrokeSkeletalMeshComponent->SecondPassMaterial == nullptr) {
 					continue;
 				}
-				Info.Material = StrokeSkeletalMeshComponent->SecondPassMaterial;
-				GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, Info, true, Collector);
+				Info->Material = StrokeSkeletalMeshComponent->SecondPassMaterial;
+				GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, *Info.Get(), true, Collector);
 			}
 		}
 	}

@@ -6,6 +6,7 @@
 ### 2021.11.19
 1. 4.27 SSpinBox控件不再导出，所以删除了IntegerSpinBox。
 2. 更新API。
+3. 使用智能指针解决因为FSectionElementInfo被回收而导致FStrokeSkeletalMeshSceneProxy会崩溃的问题。
 
 ### 2021.1.28
 1. 增加IntegerSpinBox控件
