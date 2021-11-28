@@ -2,6 +2,7 @@
 #include "Engine/Public/SkeletalMeshTypes.h"
 #include "Engine/Public/TessellationRendering.h"
 #include "Engine/Public/SkeletalRenderPublic.h"
+#include "Rendering/StrokeSkeletalMeshObjectGPUSkin.h"
 #define LOCTEXT_NAMESPACE "StrokeSkeletalMeshSceneProxy"
 
 FStrokeSkeletalMeshSceneProxy::FStrokeSkeletalMeshSceneProxy(const USkinnedMeshComponent* Component, FSkeletalMeshRenderData* InSkelMeshRenderData):
@@ -155,7 +156,7 @@ void FStrokeSkeletalMeshSceneProxy::GetDynamicMeshElements(const TArray<const FS
 			{
 				continue;
 			}
-			GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, SectionElementInfo, true, Collector);
+			FSkeletalMeshSceneProxy::GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, SectionElementInfo, true, Collector);
 			
 			//轮廓
 			if (StrokeSkeletalMeshComponent->NeedSecondPass) {
@@ -165,7 +166,7 @@ void FStrokeSkeletalMeshSceneProxy::GetDynamicMeshElements(const TArray<const FS
 					continue;
 				}
 				Info->Material = StrokeSkeletalMeshComponent->SecondPassMaterial;
-				GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, *Info.Get(), true, Collector);
+				FStrokeSkeletalMeshSceneProxy::GetDynamicElementsSection(Views, ViewFamily, VisibilityMap, LODData, LODIndex, SectionIndex, bSectionSelected, *Info.Get(), true, Collector);
 			}
 		}
 	}
@@ -210,4 +211,165 @@ void FStrokeSkeletalMeshSceneProxy::GetDynamicMeshElements(const TArray<const FS
 	}
 #endif
 }
+
+void FStrokeSkeletalMeshSceneProxy::GetDynamicElementsSection(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, 
+	const FSkeletalMeshLODRenderData& LODData, const int32 LODIndex, const int32 SectionIndex, bool bSectionSelected,
+	const FSectionElementInfo& SectionElementInfo, bool bInSelectable, FMeshElementCollector& Collector ) const
+{
+	const FSkelMeshRenderSection& Section = LODData.RenderSections[SectionIndex];
+
+	//// If hidden skip the draw
+	//if (Section.bDisabled || MeshObject->IsMaterialHidden(LODIndex,SectionElementInfo.UseMaterialIndex))
+	//{
+	//	return;
+	//}
+
+#if !WITH_EDITOR
+	const bool bIsSelected = false;
+#else // #if !WITH_EDITOR
+	bool bIsSelected = IsSelected();
+
+	// if the mesh isn't selected but the mesh section is selected in the AnimSetViewer, find the mesh component and make sure that it can be highlighted (ie. are we rendering for the AnimSetViewer or not?)
+	if( !bIsSelected && bSectionSelected && bCanHighlightSelectedSections )
+	{
+		bIsSelected = true;
+	}
+#endif // #if WITH_EDITOR
+
+	const bool bIsWireframe = ViewFamily.EngineShowFlags.Wireframe;
+
+	for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
+	{
+		if (VisibilityMap & (1 << ViewIndex))
+		{
+			const FSceneView* View = Views[ViewIndex];
+
+			FMeshBatch& Mesh = Collector.AllocateMesh();
+
+			CreateBaseMeshBatch(View, LODData, LODIndex, SectionIndex, SectionElementInfo, Mesh);
+			
+			if(!Mesh.VertexFactory)
+			{
+				// hide this part
+				continue;
+			}
+
+			Mesh.bWireframe |= bForceWireframe;
+			Mesh.Type = PT_TriangleList;
+			Mesh.bSelectable = bInSelectable;
+
+			FMeshBatchElement& BatchElement = Mesh.Elements[0];
+			const bool bRequiresAdjacencyInformation = RequiresAdjacencyInformation( SectionElementInfo.Material, Mesh.VertexFactory->GetType(), ViewFamily.GetFeatureLevel() );
+			if ( bRequiresAdjacencyInformation )
+			{
+				check(LODData.AdjacencyMultiSizeIndexContainer.IsIndexBufferValid() );
+				BatchElement.IndexBuffer = LODData.AdjacencyMultiSizeIndexContainer.GetIndexBuffer();
+				Mesh.Type = PT_12_ControlPointPatchList;
+				BatchElement.FirstIndex *= 4;
+			}
+
+		#if WITH_EDITOR
+			Mesh.BatchHitProxyId = SectionElementInfo.HitProxy ? SectionElementInfo.HitProxy->Id : FHitProxyId();
+
+			if (bSectionSelected && bCanHighlightSelectedSections)
+			{
+				Mesh.bUseSelectionOutline = true;
+			}
+			else
+			{
+				Mesh.bUseSelectionOutline = !bCanHighlightSelectedSections && bIsSelected;
+			}
+		#endif
+
+#if WITH_EDITORONLY_DATA
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+			if (bIsSelected)
+			{
+				if (ViewFamily.EngineShowFlags.VertexColors && AllowDebugViewmodes())
+				{
+					// Override the mesh's material with our material that draws the vertex colors
+					UMaterial* VertexColorVisualizationMaterial = NULL;
+					switch (GVertexColorViewMode)
+					{
+					case EVertexColorViewMode::Color:
+						VertexColorVisualizationMaterial = GEngine->VertexColorViewModeMaterial_ColorOnly;
+						break;
+
+					case EVertexColorViewMode::Alpha:
+						VertexColorVisualizationMaterial = GEngine->VertexColorViewModeMaterial_AlphaAsColor;
+						break;
+
+					case EVertexColorViewMode::Red:
+						VertexColorVisualizationMaterial = GEngine->VertexColorViewModeMaterial_RedOnly;
+						break;
+
+					case EVertexColorViewMode::Green:
+						VertexColorVisualizationMaterial = GEngine->VertexColorViewModeMaterial_GreenOnly;
+						break;
+
+					case EVertexColorViewMode::Blue:
+						VertexColorVisualizationMaterial = GEngine->VertexColorViewModeMaterial_BlueOnly;
+						break;
+					}
+					check(VertexColorVisualizationMaterial != NULL);
+
+					auto VertexColorVisualizationMaterialInstance = new FColoredMaterialRenderProxy(
+						VertexColorVisualizationMaterial->GetRenderProxy(),
+						GetSelectionColor(FLinearColor::White, bSectionSelected, IsHovered())
+					);
+
+					Collector.RegisterOneFrameMaterialProxy(VertexColorVisualizationMaterialInstance);
+					Mesh.MaterialRenderProxy = VertexColorVisualizationMaterialInstance;
+				}
+			}
+#endif // !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+#endif // WITH_EDITORONLY_DATA
+
+			BatchElement.MinVertexIndex = Section.BaseVertexIndex;
+			Mesh.CastShadow = SectionElementInfo.bEnableShadowCasting;
+			Mesh.bCanApplyViewModeOverrides = true;
+			Mesh.bUseWireframeSelectionColoring = bIsSelected;
+			Mesh.ReverseCulling = true;
+			
+		#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+			BatchElement.VisualizeElementIndex = SectionIndex;
+			Mesh.VisualizeLODIndex = LODIndex;
+		#endif
+
+			if (ensureMsgf(Mesh.MaterialRenderProxy, TEXT("GetDynamicElementsSection with invalid MaterialRenderProxy. Owner:%s LODIndex:%d UseMaterialIndex:%d"), *GetOwnerName().ToString(), LODIndex, SectionElementInfo.UseMaterialIndex))
+			{
+				Collector.AddMesh(ViewIndex, Mesh);
+			}
+
+			// const int32 NumVertices = Section.GetNumVertices();
+			// INC_DWORD_STAT_BY(STAT_GPUSkinVertices,(uint32)(bIsCPUSkinned ? 0 : NumVertices));
+			// INC_DWORD_STAT_BY(STAT_SkelMeshTriangles,Mesh.GetNumPrimitives());
+			// INC_DWORD_STAT(STAT_SkelMeshDrawCalls);
+		}
+	}
+}
+
+void FStrokeSkeletalMeshSceneProxy::CreateBaseMeshBatch(const FSceneView* View, const FSkeletalMeshLODRenderData& LODData, const int32 LODIndex, const int32 SectionIndex, const FSectionElementInfo& SectionElementInfo, FMeshBatch& Mesh) const
+{
+	Mesh.VertexFactory = MeshObject->GetSkinVertexFactory(View, LODIndex, SectionIndex);
+	Mesh.MaterialRenderProxy = SectionElementInfo.Material->GetRenderProxy();
+#if RHI_RAYTRACING
+	Mesh.SegmentIndex = SectionIndex;
+	Mesh.CastRayTracedShadow = SectionElementInfo.bEnableShadowCasting && bCastDynamicShadow;
+#endif
+
+	FMeshBatchElement& BatchElement = Mesh.Elements[0];
+	BatchElement.FirstIndex = LODData.RenderSections[SectionIndex].BaseIndex;
+	BatchElement.IndexBuffer = LODData.MultiSizeIndexContainer.GetIndexBuffer();
+	BatchElement.MinVertexIndex = LODData.RenderSections[SectionIndex].GetVertexBufferIndex();
+	BatchElement.MaxVertexIndex = LODData.RenderSections[SectionIndex].GetVertexBufferIndex() + LODData.RenderSections[SectionIndex].GetNumVertices() - 1;
+	
+	FStrokeSkeletalMeshObjectGPUSkin* MeshObjectGPUSkin=static_cast<FStrokeSkeletalMeshObjectGPUSkin*>(MeshObject);
+	FGPUSkinCacheEntry* GPUSkinCacheEntry=MeshObjectGPUSkin->GetGPUSkinCacheEntry();
+	
+	BatchElement.VertexFactoryUserData = GPUSkinCacheEntry ? &GPUSkinCacheEntry->BatchElementsUserData[SectionIndex] : nullptr;
+	BatchElement.PrimitiveUniformBuffer = GetUniformBuffer();
+	BatchElement.NumPrimitives = LODData.RenderSections[SectionIndex].NumTriangles;
+}
+
 #undef LOCTEXT_NAMESPACE
