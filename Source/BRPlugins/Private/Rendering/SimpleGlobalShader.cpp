@@ -131,7 +131,7 @@ namespace SimpleRenderingExample
 		
 		FIntPoint Size = InTexRenderTargetRHIture->GetSizeXY();
 
-		FRHIResourceCreateInfo CreateInfo;
+		FRHIResourceCreateInfo CreateInfo(TEXT("GlobalShader_ComputeShader_UAV"));
 
 		FTexture2DRHIRef Texture = RHICreateTexture2D(Size.X, Size.Y, PF_A32B32G32R32F, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo);
 		FUnorderedAccessViewRHIRef TextureUAV = RHICreateUnorderedAccessView(Texture);
@@ -151,7 +151,7 @@ namespace SimpleRenderingExample
 	#else  
 		SCOPED_DRAW_EVENT(RHIImmCmdList, GlobalShaderDraw);
 	#endif  
-		RHIImmCmdList.TransitionResource(ERHIAccess::EWritable, RenderTargetRHI);
+		RHIImmCmdList.TransitionResource(ERHIAccess::WritableMask, RenderTargetRHI);
 
 		FRHIRenderPassInfo RPInfo(RenderTargetRHI, ERenderTargetActions::DontLoad_Store, RenderTargetRHI);
 		RHIImmCmdList.BeginRenderPass(RPInfo, TEXT("SimplePixelShaderPass"));
@@ -175,7 +175,7 @@ namespace SimpleRenderingExample
 		GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = VertexDeclaration.VertexDeclarationRHI;
 		GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
 		GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
-		SetGraphicsPipelineState(RHIImmCmdList, GraphicsPSOInit);
+		SetGraphicsPipelineState(RHIImmCmdList, GraphicsPSOInit,0);
 
 		// Update viewport.
 		RHIImmCmdList.SetViewport(
@@ -222,7 +222,7 @@ void USimpleRenderingExampleBlueprintLibrary::UseGlobalShaderDraw(const UObject 
 {
 	check(IsInGameThread());
 	FTexture2DRHIRef RenderTargetRHI= OutputRenderTarget->GameThread_GetRenderTargetResource()->GetRenderTargetTexture();
-	FTexture2DRHIRef InTextureRHI = InTexture->Resource->TextureRHI->GetTexture2D();
+	FTexture2DRHIRef InTextureRHI = InTexture->GetResource()->TextureRHI->GetTexture2D();
 
 	ENQUEUE_RENDER_COMMAND(CaptureCommand)(
 		[RenderTargetRHI,Parameter,InColor,InTextureRHI](FRHICommandListImmediate& RHICmdList) {

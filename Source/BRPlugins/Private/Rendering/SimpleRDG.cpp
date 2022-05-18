@@ -48,7 +48,7 @@ namespace SimpleRenderingExample
 		SHADER_PARAMETER_STRUCT_REF(FSimpleUniformStructParameters, SimpleUniformStruct)
 		SHADER_PARAMETER_TEXTURE(Texture2D, TextureVal)
 		SHADER_PARAMETER_SAMPLER(SamplerState, TextureSampler)
-		SHADER_PARAMETER(FVector4, SimpleColor)
+		SHADER_PARAMETER(FVector4f, SimpleColor)
 		RENDER_TARGET_BINDING_SLOTS()
 		END_SHADER_PARAMETER_STRUCT()
 
@@ -196,7 +196,7 @@ namespace SimpleRenderingExample
 
 				GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
 				GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
-				SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
+				SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit,0);
 				RHICmdList.SetStencilRef(0);
 				SetShaderParameters(RHICmdList, PixelShader, PixelShader.GetPixelShader(), *Parameters);
 
@@ -237,7 +237,7 @@ void USimpleRenderingExampleBlueprintLibrary::UseRDGDraw(const UObject *WorldCon
 	check(IsInGameThread());
 
 	FTexture2DRHIRef RenderTargetRHI = OutputRenderTarget->GameThread_GetRenderTargetResource()->GetRenderTargetTexture();
-	FTexture2DRHIRef InTextureRHI = InTexture->Resource->TextureRHI->GetTexture2D();
+	FTexture2DRHIRef InTextureRHI = InTexture->GetResource()->TextureRHI->GetTexture2D();
 
 	ENQUEUE_RENDER_COMMAND(CaptureCommand)
 	(
